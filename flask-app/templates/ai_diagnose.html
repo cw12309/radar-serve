@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI诊断</title>
+    <link rel="stylesheet" href="static/css/styles.css?v=20261115-merge">
+    <style>
+        .workflow-steps { overflow-x: auto; }
+        .workflow-step.workflow-records-link { color: var(--text-primary); text-decoration: none; }
+        .workflow-records-link span { background: var(--primary); border-color: var(--primary); color: white; }
+        .workflow-records-link:hover strong,
+        .workflow-records-link:focus-visible strong { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <!-- 主内容区：只保留 上传 → AI诊断 → 分割叠加·交互看片 → 报告生成 -->
+    <main class="main-container">
+        <div id="diagnosis-page" class="page active">
+            <div class="page-header">
+                <div class="workflow-kicker">RIMAG · AI MEDICAL IMAGING</div>
+                <h2>腹部CT智能诊断</h2>
+            </div>
+
+            <div class="workflow-steps">
+                <div class="workflow-step active"><span>1</span><strong>上传影像</strong></div>
+                <div class="workflow-line"></div>
+                <div class="workflow-step" id="workflowViewerStep"><span>2</span><strong>AI诊断</strong></div>
+                <div class="workflow-line"></div>
+                <div class="workflow-step" id="workflowDiagnosisStep"><span>3</span><strong>交互看片</strong></div>
+                <div class="workflow-line"></div>
+                <div class="workflow-step" id="workflowReportStep"><span>4</span><strong>报告生成</strong></div>
+                <div class="workflow-line" data-radar-records-nav hidden></div>
+                <a class="workflow-step workflow-records-link" href="/manage/radar-records" target="_top" data-radar-records-nav hidden><span>5</span><strong>列表</strong></a>
+            </div>
+
+            <!-- 影像上传（可折叠） -->
+            <div class="upload-section card">
+                <div class="card-body">
+                    <!-- 折叠开关 / 紧凑一行元数据 -->
+                    <div class="upload-toggle-bar" id="uploadToggleBar">
+                        <button class="upload-toggle-btn" id="uploadToggleBtn" type="button">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/>
+                                <polyline points="16 6 12 2 8 6"/>
+                                <line x1="12" y1="2" x2="12" y2="15"/>
+                            </svg>
+                            <span id="uploadToggleLabel">点击上传影像</span>
+                            <svg class="upload-toggle-caret" id="uploadToggleCaret" viewBox="0 0 24 24"
+                                 width="14" height="14" fill="none" stroke="currentColor"
+                                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </button>
+                        <!-- 紧凑一行元数据（选完文件后显示） -->
+                        <div id="fileInfoCompact" class="file-info-compact" style="display: none;">
+                            <span class="fic-icon">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <ellipse cx="12" cy="5.5" rx="8" ry="3"/>
+                                    <path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>
+                                    <path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>
+                                </svg>
+                            </span>
+                            <span class="fic-name" id="fileName"></span>
+                            <span class="fic-divider">·</span>
+                            <span class="fic-chip" id="fileType"></span>
+                            <span class="fic-divider">·</span>
+                            <span class="fic-chip fic-ghost" id="fileSize"></span>
+                            <span class="fic-divider">·</span>
+                            <span class="fic-chip fic-ghost" id="fileShape"></span>
+                            <span class="fic-divider">·</span>
+                            <span class="fic-chip fic-ghost" id="fileSlices"></span>
+                            <span class="fic-divider">·</span>
+                            <span class="fic-chip fic-ghost" id="fileSpacing"></span>
+                            <button class="fic-replace" id="ficReplace" type="button">更换</button>
+                        </div>
+                    </div>
+
+                    <!-- 折叠上传区 -->
+                    <div class="upload-area" id="uploadArea">
+                        <i class="upload-corner tl"></i><i class="upload-corner tr"></i>
+                        <i class="upload-corner bl"></i><i class="upload-corner br"></i>
+                        <div class="upload-visual">
+                            <span class="upload-glow"></span>
+                            <svg class="upload-icon-svg" viewBox="0 0 64 64" fill="none"
+                                 stroke="currentColor" stroke-width="3"
+                                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="8" y="14" width="48" height="36" rx="6"/>
+                                <path d="M14 32h7l4-8 6 16 5-10 3 2h11"/>
+                                <path d="M32 5v5M32 54v5M3 32h5M56 32h5" opacity=".5"/>
+                            </svg>
+                        </div>
+                        <p class="upload-text">拖拽文件夹 / 切片序列 / 体数据到此处</p>
+                        <input type="file" id="fileInput" multiple accept=".nii,.gz,.dcm,.dicom,.zip,.tar,.tgz,.bz2" hidden>
+                        <input type="file" id="folderInput" webkitdirectory directory multiple hidden>
+                        <div class="upload-actions">
+                            <button class="btn btn-primary upload-btn-main" onclick="document.getElementById('fileInput').click()">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <path d="M14 2v6h6"/>
+                                </svg>
+                                选择文件
+                            </button>
+                            <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                </svg>
+                                选择文件夹
+                            </button>
+                        </div>
+                        <div class="upload-formats">
+                            <span class="fmt-chip">整套 DICOM 序列</span>
+                            <span class="fmt-chip">NIfTI 体数据</span>
+                            <span class="fmt-chip">ZIP / TAR 压缩包</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 诊断进度（手动开始按钮已移除：诊断由序列确认框触发） -->
+            <div id="diagnoseSection" class="diagnose-section" style="display: none;">
+                <div id="diagProgress" class="diag-progress" hidden>
+                    <div class="diag-progress-head">
+                        <span class="diag-progress-title">AI辅助诊断进行中</span>
+                        <span class="diag-progress-elapsed" id="diagProgressElapsed"></span>
+                    </div>
+                    <div class="diag-progress-bar"><i id="diagProgressBar"></i></div>
+                    <ul class="diag-progress-steps" id="diagProgressSteps"></ul>
+                    <p class="diag-progress-hint">诊断期间页面不会锁定：可继续滚动查看，完成后结果区自动更新。</p>
+                </div>
+            </div>
+
+            <!-- 诊断结果：分割叠加·交互看片 + 报告生成 -->
+            <div id="resultSection" class="result-section" style="display: none;">
+                <!-- 输入适用性警告（扫描范围/对比剂不满足训练分布时显示） -->
+                <div class="input-warnings card" id="inputWarnings" hidden></div>
+
+                <!-- 分割叠加交互看片 -->
+                <div class="result-card card" id="overlayCard" style="display: none;">
+                    <div class="card-title-row">
+                        <div class="card-title-left">
+                            <!-- series-switch: 序列切换下拉，替换原静态标题；
+                                 无 case_id（外部上传）时仅显示状态提示 -->
+                            <div class="series-picker" id="seriesPicker" hidden>
+                                <select id="seriesSelect" title="切换当前病例的诊断序列"></select>
+                            </div>
+                            <!-- 单窗来源切换：同一窗口在 AI 叠加与原始序列切片间来回切换 -->
+                            <div class="overlay-mode-toggle overlay-src-toggle" id="overlaySrcToggle">
+                                <button type="button" class="mode-btn is-active" data-src="ai">处理序列</button>
+                                <button type="button" class="mode-btn" data-src="orig">原始序列</button>
+                            </div>
+                            <span class="card-title-note" id="overlaySrcLabel"></span>
+                        </div>
+                        <div class="card-title-tools">
+                            <span class="card-title-note" id="overlayHint">滚轮翻层 · 悬停查看器官 · 图例可跳转</span>
+                            <!-- 2D 缩放工具条：+/−/复位，百分比实时显示 -->
+                            <div class="overlay-zoom-ctl">
+                                <button type="button" id="overlayZoomOut" title="缩小">−</button>
+                                <span id="overlayZoomVal">100%</span>
+                                <button type="button" id="overlayZoomIn" title="放大">＋</button>
+                                <button type="button" id="overlayZoomReset" title="复位缩放与平移">复位</button>
+                            </div>
+                            <div class="overlay-mode-toggle" id="overlayModeToggle">
+                                <button type="button" class="mode-btn is-active" data-mode="2d">2D 切片</button>
+                                <button type="button" class="mode-btn" data-mode="3d">3D 重建</button>
+                            </div>
+                            <button class="btn-text" id="overlayAllOrgansBtn" type="button">全选器官</button>
+                            <button class="btn-text" id="overlayAffectedBtn" type="button">只看受累器官</button>
+                        </div>
+                    </div>
+
+                    <div class="overlay-body">
+                        <div class="overlay-stage" id="overlayStage">
+                            <canvas id="overlayCanvas"></canvas>
+                            <div class="overlay-cursor-tip" id="overlayCursorTip"></div>
+                            <!-- 控制面板抽屉手柄：点击向右收起 / 向左展开，
+                                 收起后看片舞台占满让出的宽度 -->
+                            <button type="button" class="overlay-side-toggle" id="overlaySideToggle"
+                                    title="收起控制面板">»</button>
+                        </div>
+                        <div class="overlay-stage3d" id="overlayStage3d" hidden>
+                            <div class="stage3d-hint">拖拽旋转 · 滚轮缩放 · 右键平移</div>
+                            <div class="stage3d-loading" id="stage3dLoading" hidden>正在生成 3D 网格…</div>
+                            <div class="stage3d-error" id="stage3dError" hidden></div>
+                        </div>
+
+                        <div class="overlay-side">
+                            <div class="side-tabs" role="tablist">
+                                <button type="button" class="side-tab is-active" id="sideTabControls"
+                                        role="tab" aria-selected="true">控制面板</button>
+                                <button type="button" class="side-tab" id="sideTabReport"
+                                        role="tab" aria-selected="false">审核报告</button>
+                            </div>
+                            <div class="side-pane side-pane-controls" id="sidePaneControls">
+                            <div class="overlay-control">
+                                <label for="overlaySlice">轴位切片 <span id="overlaySliceVal">-</span></label>
+                                <input type="range" id="overlaySlice" min="0" max="0" value="0" step="1">
+                                <div class="overlay-play-row">
+                                    <button class="btn-text" id="overlayPlayBtn" type="button">▶ 播放</button>
+                                    <span class="overlay-size" id="overlaySize"></span>
+                                </div>
+                            </div>
+
+                            <div class="overlay-control">
+                                <label for="overlayOpacity">叠加透明度 <span id="overlayOpacityVal">45%</span></label>
+                                <input type="range" id="overlayOpacity" min="0" max="100" value="45" step="5">
+                            </div>
+
+                            <div class="overlay-control">
+                                <label for="overlaySegSource">分割来源</label>
+                                <select id="overlaySegSource">
+                                    <option value="full">完整分割（后处理）</option>
+                                    <option value="raw" selected>模型原始输出</option>
+                                    <option value="fine" hidden>精细分割（TotalSegmentator）</option>
+                                </select>
+                            </div>
+
+                            <div class="overlay-control">
+                                <label for="overlayMode">渲染模式</label>
+                                <select id="overlayMode">
+                                    <option value="fill">填充叠加</option>
+                                    <option value="contour">仅轮廓</option>
+                                    <option value="heat" selected>注意力热力</option>
+                                    <option value="ct">仅CT（隐藏叠加）</option>
+                                </select>
+                                <div class="overlay-heat-legend" id="overlayHeatLegend">
+                                    <span class="heat-grad"></span>
+                                    <span class="heat-scale"><i>低</i><i>置信度</i><i>高</i></span>
+                                    <span class="heat-note">热力强度 = 受累器官诊断项阳性概率</span>
+                                </div>
+                            </div>
+
+                            <div class="overlay-control overlay-control-legend">
+                                <label>器官图例 <span class="card-title-note" id="overlayLegendCount"></span></label>
+                                <div class="overlay-legend" id="overlayLegend"></div>
+                            </div>
+                            </div>
+
+                            <div class="side-pane side-pane-report" id="sidePaneReport" hidden>
+                                <div class="rpt-switch" role="tablist">
+                                    <button type="button" class="rpt-switch-btn is-active" id="rptModeRevised"
+                                            role="tab" aria-selected="true">审核报告</button>
+                                    <button type="button" class="rpt-switch-btn" id="rptModeOriginal"
+                                            role="tab" aria-selected="false">原始报告</button>
+                                </div>
+                                <div class="rpt-meta" id="rptMeta"></div>
+                                <div class="rpt-body" id="rptBody">
+                                    <div class="rpt-empty">尚未加载报告</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 影像学发现速览列（看片时免翻页对照） -->
+                        <div class="overlay-findings" id="overlayFindings">
+                            <div class="overlay-findings-head">
+                                <span>影像学发现</span>
+                                <!-- 置信度阈值：本地对完整诊断集合重新过滤，
+                                     发现列表/叠加受累器官/报告同步更新 -->
+                                <div class="threshold-ctl">
+                                    <button class="threshold-btn" id="thresholdBtn" type="button"
+                                            title="设置列入结果的置信度阈值">
+                                        ⚙ <span id="thresholdVal">—</span>
+                                    </button>
+                                    <div class="threshold-pop" id="thresholdPop" hidden>
+                                        <div class="threshold-pop-head">
+                                            <span>置信度阈值</span>
+                                            <span id="thresholdPopVal">—</span>
+                                        </div>
+                                        <input type="range" id="thresholdRange" min="0" max="100" step="5" value="50">
+                                        <div class="threshold-pop-hint">仅列出置信度 ≥ 阈值的发现，并同步到叠加受累器官与PDF报告</div>
+                                    </div>
+                                </div>
+                                <!-- 报告入口与采纳计数合并：诊断完成前置灰，
+                                     标签显示「生成报告：n/m」；圆点指示大模型服务状态 -->
+                                <button class="ovf-report-btn" id="overlayReportBtn" type="button"
+                                        title="按已采纳的发现生成PDF报告" disabled><span
+                                        class="ovf-report-dot" id="reportModeDot"></span><span
+                                        id="reportBtnLabel">生成报告</span></button>
+                            </div>
+                            <div class="overlay-findings-list" id="overlayFindingsList"></div>
+                            <!-- match-panel: AI 诊断病症 × 报告检查结论 命中分析 -->
+                            <div class="ovf-match" id="ovfMatch">
+                                <div class="ovf-match-head">
+                                    <span class="ovm-cap">诊断匹配分析</span>
+                                    <span class="ovf-match-rate" id="ovfMatchRate">—</span>
+                                </div>
+                                <div class="ovm-stats" id="ovfMatchStats"></div>
+                                <div class="ovf-match-list" id="ovfMatchList"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 加载提示 -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p id="loadingText">处理中...</p>
+    </div>
+
+    <!-- Toast通知 -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+    // 同源反代垫片：经主站 /radar/ 前缀访问时，页面 JS 里的根绝对路径
+    // （fetch('/api/...') 等）会绕过前缀打到主站自身 API。这里统一补前缀；
+    // 模板静态资源已改相对路径，随当前目录解析。直连 5000 端口无前缀时不生效。
+    (function () {
+        var m = location.pathname.match(/^\/radar(?=\/)/);
+        if (!m) return;
+        document.querySelectorAll('[data-radar-records-nav]').forEach(function (item) { item.hidden = false; });
+        var prefix = '/radar';
+        var rewrite = function (u) {
+            return (typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/') ? prefix + u : u;
+        };
+        var origFetch = window.fetch;
+        window.fetch = function (input, init) {
+            if (typeof input === 'string') input = rewrite(input);
+            else if (input && input.url) input = new Request(rewrite(input.url), input);
+            return origFetch.call(this, input, init);
+        };
+        var OrigES = window.EventSource;
+        window.EventSource = function (url, opts) { return new OrigES(rewrite(url), opts); };
+        window.EventSource.prototype = OrigES.prototype;
+        // 上传走 XHR（要实时进度），open 的根绝对路径同样要补前缀
+        var origOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function (method, url) {
+            var args = Array.prototype.slice.call(arguments);
+            args[1] = rewrite(url);
+            return origOpen.apply(this, args);
+        };
+    })();
+    </script>
+    <script src="static/js/library.js"></script>
+    <script src="static/js/app.js?v=20261115-merge"></script>
+</body>
+</html>

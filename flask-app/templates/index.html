@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RADAR医学影像诊断平台 - 专业版</title>
+    <link rel="stylesheet" href="static/css/styles.css?v=20261116-colfix">
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <div class="logo">🏥</div>
+                <div class="brand-text">
+                    <h1>RADAR</h1>
+                    <span>医学影像诊断平台</span>
+                </div>
+            </div>
+            <div class="navbar-menu">
+                <a href="#" class="nav-item active" data-page="diagnosis">
+                    <span class="icon">🔍</span>
+                    <span>影像诊断</span>
+                </a>
+                <a href="#" class="nav-item" data-page="library">
+                    <span class="icon">🗂️</span>
+                    <span>院内影像库</span>
+                </a>
+                <a href="#" class="nav-item" data-page="batch">
+                    <span class="icon">📊</span>
+                    <span>批量处理</span>
+                </a>
+                <a href="#" class="nav-item" data-page="history">
+                    <span class="icon">📜</span>
+                    <span>历史记录</span>
+                </a>
+                <a href="#" class="nav-item" data-page="settings">
+                    <span class="icon">⚙️</span>
+                    <span>系统设置</span>
+                </a>
+            </div>
+            <div class="navbar-status">
+                <div class="status-indicator online"></div>
+                <span>系统在线</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="main-container">
+        <!-- 影像诊断页面 -->
+        <div id="diagnosis-page" class="page active">
+            <div class="page-header">
+                <div class="workflow-kicker">RADAR · AI MEDICAL IMAGING</div>
+                <h2>腹部CT智能诊断</h2>
+                <p>上传影像后，系统将自动进入专业OHIF影像查看器，并在同一页面完成AI诊断。</p>
+            </div>
+
+            <div class="workflow-steps">
+                <div class="workflow-step active"><span>1</span><strong>上传影像</strong></div>
+                <div class="workflow-line"></div>
+                <div class="workflow-step" id="workflowViewerStep"><span>2</span><strong>查看影像</strong></div>
+                <div class="workflow-line"></div>
+                <div class="workflow-step" id="workflowDiagnosisStep"><span>3</span><strong>AI诊断</strong></div>
+                <div class="workflow-line"></div>
+                <div class="workflow-step" id="workflowReportStep"><span>4</span><strong>查看结果</strong></div>
+            </div>
+
+            <!-- 文件上传区 -->
+            <div class="upload-section card">
+                <div class="card-header">
+                    <h3>📥 载入影像</h3>
+                    <div class="upload-tabs">
+                        <button class="upload-tab active" type="button" data-upload-tab="external">外部导入（上传）</button>
+                        <button class="upload-tab" type="button" data-upload-tab="library">院内影像库</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">📁</div>
+                        <p class="upload-text">拖拽文件夹 / 切片序列 / 体数据，或直接选择</p>
+                        <p class="upload-hint">支持 NIfTI体数据、整套DICOM序列（选文件夹 / 多选切片 / zip压缩包）、NumPy、PNG/JPG</p>
+                        <input type="file" id="fileInput" multiple accept=".nii,.gz,.npy,.dcm,.dicom,.png,.jpg,.jpeg,.zip,.tar,.tgz,.bz2" hidden>
+                        <input type="file" id="folderInput" webkitdirectory directory multiple hidden>
+                        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                            选择文件
+                        </button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">
+                            选择文件夹
+                        </button>
+                    </div>
+
+                    <!-- 院内影像库入口：服务器已有数据，无需下载再上传 -->
+                    <div class="library-entry" id="libraryEntry" hidden>
+                        <div class="library-entry-icon">🗂️</div>
+                        <div class="library-entry-text">
+                            <strong>服务器上已有 <span id="libraryEntryCount">-</span> 例脱敏腹部 CT</strong>
+                            <p>按病种分类浏览，选中一个轴位序列即可零拷贝进入阅片与诊断，不必把几十 GB 数据下载到本地再传回来。</p>
+                        </div>
+                        <button class="btn btn-primary" id="libraryEntryBtn" type="button">浏览院内影像库</button>
+                    </div>
+                    
+                    <!-- 文件信息 -->
+                    <div id="fileInfo" class="file-info" style="display: none;">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">文件名</span>
+                                <span class="info-value" id="fileName"></span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">格式类型</span>
+                                <span class="info-value" id="fileType"></span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">影像尺寸</span>
+                                <span class="info-value" id="fileShape"></span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">切片数量</span>
+                                <span class="info-value" id="fileSlices"></span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">体素间距</span>
+                                <span class="info-value" id="fileSpacing"></span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">文件大小</span>
+                                <span class="info-value" id="fileSize"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 患者与检查信息（从 DICOM / NIfTI 头读取） -->
+                    <div id="fileMeta" class="file-info file-meta" style="display: none;">
+                        <div class="file-meta-head">
+                            <h4 id="fileMetaTitle">检查信息</h4>
+                            <span class="file-meta-source" id="fileMetaSource"></span>
+                        </div>
+                        <div class="info-grid" id="fileMetaGrid"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 影像查看器 -->
+            <div id="viewerSection" class="viewer-section" style="display: none;">
+                <div class="section-heading">
+                    <div><span class="section-index">02</span><h3>专业影像查看</h3></div>
+                    <span class="viewer-status"><i></i> OHIF Viewer · Cornerstone3D</span>
+                </div>
+
+                <div id="advancedViewer" class="viewer-panel active">
+                    <div class="viewer-container card">
+                        <div class="viewer-toolbar ohif-toolbar">
+                            <div class="toolbar-group">
+                                <span class="viewer-study-name" id="viewerStudyName">当前检查</span>
+                            </div>
+                            <a class="btn btn-secondary viewer-external-link" id="openOhifNewTab" href="#" target="_blank" rel="noopener">新窗口打开查看器 ↗</a>
+                        </div>
+                        <div class="viewer-content ohif-viewer-content">
+                            <div id="webglWarn" class="webgl-warn" hidden>
+                                <strong>查看器主视口无法渲染：当前浏览器 WebGL2 不可用</strong>
+                                （影像数据已正常加载，左侧缩略图不受影响，这是纯渲染环境问题，与数据无关）
+                                <span>解决办法任选其一后刷新：① Chrome 设置 → 系统 → 打开「使用硬件加速模式（如果可用）」并重启浏览器；② 无显卡/远程桌面环境在地址栏输入 <code>chrome://flags/#enable-unsafe-swiftshader</code> 设为 Enabled 后重启（允许软件渲染）；③ 点右上「新窗口打开查看器」重试。</span>
+                            </div>
+                            <iframe id="ohifViewerFrame" title="OHIF医学影像查看器" allow="fullscreen" style="width:100%;height:720px;border:0;background:#05070a;"></iframe>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI诊断按钮 -->
+            <div id="diagnoseSection" class="diagnose-section" style="display: none;">
+                <div class="section-heading">
+                    <div><span class="section-index">03</span><h3>AI辅助诊断</h3></div>
+                    <span class="diagnosis-note">AI结果仅供辅助参考，需由临床医生审核</span>
+                </div>
+                <button class="btn btn-primary btn-large" id="diagnoseBtn">
+                    <span class="btn-icon">✦</span>
+                    开始AI诊断
+                </button>
+                <!-- 诊断进度：局部进度条替代全屏遮罩，诊断期间页面其余部分
+                     仍可滚动/查看影像；步骤由 /api/diagnose/<id>/progress 轮询驱动 -->
+                <div id="diagProgress" class="diag-progress" hidden>
+                    <div class="diag-progress-head">
+                        <span class="diag-progress-title">AI辅助诊断进行中</span>
+                        <span class="diag-progress-elapsed" id="diagProgressElapsed"></span>
+                    </div>
+                    <div class="diag-progress-bar"><i id="diagProgressBar"></i></div>
+                    <ul class="diag-progress-steps" id="diagProgressSteps"></ul>
+                    <p class="diag-progress-hint">诊断期间页面不会锁定：可继续滚动、查看影像与历史记录，完成后结果区自动更新。</p>
+                </div>
+            </div>
+
+            <!-- 诊断结果 -->
+            <div id="resultSection" class="result-section" style="display: none;">
+                <div class="result-header card">
+                    <div><span class="section-index">04</span><h3>诊断结果</h3></div>
+                    <div class="result-header-meta">
+                        <span class="result-status">分析完成</span>
+                        <span class="result-engine" id="resultEngine"></span>
+                    </div>
+                </div>
+
+                <!-- 患者与检查信息（诊断结果随附） -->
+                <div class="result-card card" id="resultMetaCard" style="display: none;">
+                    <div class="card-title-row">
+                        <h4>患者与检查信息</h4>
+                        <span class="card-title-note" id="resultMetaSource"></span>
+                    </div>
+                    <div class="info-grid" id="resultMetaGrid"></div>
+                </div>
+
+                <!-- 原始报告对照（仅库内导入的病例有） -->
+                <div class="result-card card" id="originalReportCard" style="display: none;">
+                    <div class="card-title-row">
+                        <h4>院内原始报告对照</h4>
+                        <span class="card-title-note" id="originalReportNote"></span>
+                    </div>
+                    <div class="report-compare">
+                        <div class="report-pane">
+                            <div class="report-pane-head">原始报告（人工）</div>
+                            <div class="report-pane-body" id="originalReportBody"></div>
+                        </div>
+                        <div class="report-pane">
+                            <div class="report-pane-head">RADAR 发现（AI）</div>
+                            <div class="report-pane-body" id="aiReportBody"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 输入适用性警告（扫描范围/对比剂不满足训练分布时显示） -->
+                <div class="input-warnings card" id="inputWarnings" hidden></div>
+
+                <!-- 总体印象横幅 -->
+                <div class="impression-banner card" id="impressionBanner">
+                    <div class="impression-risk" id="impressionRisk">
+                        <div class="impression-risk-label">总体风险分级</div>
+                        <div class="impression-risk-value" id="overallRiskValue">-</div>
+                    </div>
+                    <div class="impression-summary">
+                        <div class="impression-headline" id="impressionHeadline"></div>
+                        <div class="impression-detail" id="impressionDetail"></div>
+                    </div>
+                </div>
+
+                <!-- 关键指标 -->
+                <div class="result-metrics">
+                    <div class="metric-card card">
+                        <div class="metric-label">阳性诊断项</div>
+                        <div class="metric-value" id="lesionCount">-</div>
+                        <div class="metric-hint" id="lesionCountHint">超过置信度阈值</div>
+                    </div>
+                    <div class="metric-card card">
+                        <div class="metric-label">最高置信度</div>
+                        <div class="metric-value" id="confidenceValue">-</div>
+                        <div class="metric-hint" id="confidenceHint">-</div>
+                    </div>
+                    <div class="metric-card card">
+                        <div class="metric-label">风险分级</div>
+                        <div class="metric-value metric-value-sm" id="severityValue">-</div>
+                        <div class="metric-hint" id="severityHint">取最高置信度项</div>
+                    </div>
+                    <div class="metric-card card">
+                        <div class="metric-label">分割器官</div>
+                        <div class="metric-value" id="organCount">-</div>
+                        <div class="metric-hint">RADAR 视觉分支识别</div>
+                    </div>
+                </div>
+
+                <!-- 影像学发现 -->
+                <div class="result-card card">
+                    <div class="card-title-row">
+                        <h4>影像学发现</h4>
+                        <div class="card-title-tools">
+                            <span class="severity-legend"><i class="dot dot-high"></i>高</span>
+                            <span class="severity-legend"><i class="dot dot-medium"></i>中</span>
+                            <span class="severity-legend"><i class="dot dot-low"></i>低</span>
+                            <button class="btn-text" id="toggleFindingsBtn" type="button">展开全部</button>
+                        </div>
+                    </div>
+                    <div id="findingsList" class="findings-grid"></div>
+                </div>
+
+                <div class="result-duo">
+                    <!-- 器官分割 -->
+                    <div class="result-card card">
+                        <div class="card-title-row">
+                            <h4>器官分割结果</h4>
+                            <span class="card-title-note" id="organNote"></span>
+                        </div>
+                        <div id="organChips" class="organ-chips"></div>
+                    </div>
+
+                    <!-- Top-N 诊断项得分 -->
+                    <div class="result-card card">
+                        <div class="card-title-row">
+                            <h4>诊断项得分排行</h4>
+                            <span class="card-title-note">视觉-文本匹配阳性概率</span>
+                        </div>
+                        <div id="topScoresChart" class="score-chart"></div>
+                    </div>
+                </div>
+
+                <!-- 分割叠加交互看片 -->
+                <div class="result-card card" id="overlayCard" style="display: none;">
+                    <div class="card-title-row">
+                        <div class="card-title-left">
+                            <h4>AI结果 · 交互看片</h4>
+                            <!-- 单窗来源切换：同一窗口在 AI 叠加与原始序列切片间来回切换 -->
+                            <div class="overlay-mode-toggle overlay-src-toggle" id="overlaySrcToggle">
+                                <button type="button" class="mode-btn is-active" data-src="ai">处理序列</button>
+                                <button type="button" class="mode-btn" data-src="orig">原始序列</button>
+                            </div>
+                            <span class="card-title-note" id="overlaySrcLabel"></span>
+                        </div>
+                        <div class="card-title-tools">
+                            <span class="card-title-note" id="overlayHint">滚轮翻层 · 悬停查看器官 · 图例可跳转</span>
+                            <!-- 2D 缩放工具条：+/−/复位，百分比实时显示 -->
+                            <div class="overlay-zoom-ctl">
+                                <button type="button" id="overlayZoomOut" title="缩小">−</button>
+                                <span id="overlayZoomVal">100%</span>
+                                <button type="button" id="overlayZoomIn" title="放大">＋</button>
+                                <button type="button" id="overlayZoomReset" title="复位缩放与平移">复位</button>
+                            </div>
+                            <div class="overlay-mode-toggle" id="overlayModeToggle">
+                                <button type="button" class="mode-btn is-active" data-mode="2d">2D 切片</button>
+                                <button type="button" class="mode-btn" data-mode="3d">3D 重建</button>
+                            </div>
+                            <button class="btn-text" id="dualViewToggle" type="button"
+                                    title="并排对照：AI 处理后 96 层 vs 原始 DICOM 序列同层">原始序列对照</button>
+                            <button class="btn-text" id="overlayAllOrgansBtn" type="button">全选器官</button>
+                            <button class="btn-text" id="overlayAffectedBtn" type="button">只看受累器官</button>
+                        </div>
+                    </div>
+
+                    <div class="overlay-body">
+                        <div class="overlay-stage" id="overlayStage">
+                            <canvas id="overlayCanvas"></canvas>
+                            <div class="overlay-cursor-tip" id="overlayCursorTip"></div>
+                            <div class="overlay-loading" id="overlayLoading">加载切片…</div>
+                        </div>
+                        <div class="overlay-stage3d" id="overlayStage3d" hidden>
+                            <div class="stage3d-hint">拖拽旋转 · 滚轮缩放 · 右键平移</div>
+                            <div class="stage3d-loading" id="stage3dLoading" hidden>正在生成 3D 网格…</div>
+                            <div class="stage3d-error" id="stage3dError" hidden></div>
+                        </div>
+
+                        <div class="overlay-side">
+                            <div class="overlay-control">
+                                <label for="overlaySlice">轴位切片 <span id="overlaySliceVal">-</span></label>
+                                <input type="range" id="overlaySlice" min="0" max="0" value="0" step="1">
+                                <div class="overlay-play-row">
+                                    <button class="btn-text" id="overlayPlayBtn" type="button">▶ 播放</button>
+                                    <span class="overlay-size" id="overlaySize"></span>
+                                </div>
+                            </div>
+
+                            <div class="overlay-control">
+                                <label for="overlayOpacity">叠加透明度 <span id="overlayOpacityVal">45%</span></label>
+                                <input type="range" id="overlayOpacity" min="0" max="100" value="45" step="5">
+                            </div>
+
+                            <div class="overlay-control">
+                                <label for="overlaySegSource">分割来源</label>
+                                <select id="overlaySegSource">
+                                    <option value="full">完整分割（后处理）</option>
+                                    <option value="raw" selected>模型原始输出</option>
+                                    <option value="fine" hidden>精细分割（TotalSegmentator）</option>
+                                </select>
+                            </div>
+
+                            <div class="overlay-control">
+                                <label for="overlayMode">渲染模式</label>
+                                <select id="overlayMode">
+                                    <option value="fill">填充叠加</option>
+                                    <option value="contour">仅轮廓</option>
+                                    <option value="heat" selected>注意力热力</option>
+                                    <option value="ct">仅CT（隐藏叠加）</option>
+                                </select>
+                                <div class="overlay-heat-legend" id="overlayHeatLegend">
+                                    <span class="heat-grad"></span>
+                                    <span class="heat-scale"><i>低</i><i>置信度</i><i>高</i></span>
+                                    <span class="heat-note">热力强度 = 受累器官诊断项阳性概率</span>
+                                </div>
+                            </div>
+
+                            <div class="overlay-control">
+                                <label>器官图例 <span class="card-title-note" id="overlayLegendCount"></span></label>
+                                <div class="overlay-legend" id="overlayLegend"></div>
+                            </div>
+                        </div>
+
+                        <!-- 影像学发现速览列（看片时免翻页对照） -->
+                        <div class="overlay-findings" id="overlayFindings">
+                            <div class="overlay-findings-head">
+                                <span>影像学发现</span>
+                                <!-- 置信度阈值：本地对完整诊断集合重新过滤，
+                                     发现列表/叠加受累器官/报告同步更新 -->
+                                <div class="threshold-ctl">
+                                    <button class="threshold-btn" id="thresholdBtn" type="button"
+                                            title="设置列入结果的置信度阈值">
+                                        ⚙ <span id="thresholdVal">—</span>
+                                    </button>
+                                    <div class="threshold-pop" id="thresholdPop" hidden>
+                                        <div class="threshold-pop-head">
+                                            <span>置信度阈值</span>
+                                            <span id="thresholdPopVal">—</span>
+                                        </div>
+                                        <input type="range" id="thresholdRange" min="0" max="100" step="5" value="50">
+                                        <div class="threshold-pop-hint">仅列出置信度 ≥ 阈值的发现，并同步到叠加受累器官与PDF报告</div>
+                                    </div>
+                                </div>
+                                <!-- 报告入口与采纳计数合并：诊断完成前置灰，
+                                     标签显示「生成报告：n/m」 -->
+                                <button class="ovf-report-btn" id="overlayReportBtn" type="button"
+                                        title="按已采纳的发现生成PDF报告" disabled>生成报告</button>
+                            </div>
+                            <div class="overlay-findings-list" id="overlayFindingsList"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 原始序列对照阅片：左 = AI 处理后 96 层叠加空间，
+                     右 = 原始 DICOM 序列同层（层号按预处理变换映射）。
+                     缩放/平移/器官可见性/定位标注与主看片完全联动 -->
+                <div class="result-card card dual-view-card" id="dualViewCard" style="display: none;">
+                    <div class="card-title-row">
+                        <h4>原始序列对照 · 双窗联动</h4>
+                        <div class="card-title-tools">
+                            <span class="card-title-note">滚轮翻层两窗同步 · Ctrl+滚轮缩放 · 拖拽平移 · 双击复位</span>
+                        </div>
+                    </div>
+                    <div class="dual-body">
+                        <div class="dual-pane">
+                            <div class="dual-pane-head"><span id="dualAiSlice">处理序列 · —</span></div>
+                            <div class="dual-stage">
+                                <canvas id="dualCanvasAi"></canvas>
+                            </div>
+                        </div>
+                        <div class="dual-pane">
+                            <div class="dual-pane-head"><span id="dualOrigSlice">原始序列 · —</span></div>
+                            <div class="dual-stage" id="dualStageOrig">
+                                <canvas id="dualCanvasOrig"></canvas>
+                                <div class="overlay-loading" id="dualLoading">加载原始序列切片…</div>
+                                <div class="dual-unavailable" id="dualUnavailable" hidden></div>
+                            </div>
+                        </div>
+                        <div class="dual-cursor-tip" id="dualCursorTip"></div>
+                    </div>
+                </div>
+
+                <!-- 建议处理 -->
+                <div class="result-card card">
+                    <div class="card-title-row"><h4>建议处理</h4></div>
+                    <ul id="recommendationsList" class="recommendations-list"></ul>
+                </div>
+
+                <!-- 可解释性与证据 -->
+                <div class="result-card card">
+                    <div class="card-title-row">
+                        <h4>可解释性与证据</h4>
+                        <button class="btn-text" id="toggleExplanationBtn" type="button">展开全部</button>
+                    </div>
+                    <div class="explanation-block">
+                        <p class="explanation-lead" id="explanationMethod"></p>
+                        <p class="explanation-note" id="explanationSummary"></p>
+                        <div class="evidence-list" id="evidenceList"></div>
+                        <div class="limitations" id="limitationsBox"></div>
+                        <div class="inference-meta" id="inferenceMeta"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 院内影像库页面 -->
+        <div id="library-page" class="page">
+            <div class="page-header lib-header">
+                <div>
+                    <div class="workflow-kicker">IN-HOUSE IMAGE LIBRARY</div>
+                    <h2>院内影像库</h2>
+                    <p>直接选用服务器上已有的脱敏 CT 阅片诊断，无需下载再上传。选中序列后零拷贝进入 OHIF 与 AI 诊断。</p>
+                </div>
+                <div class="lib-header-actions">
+                    <span class="lib-stat" id="libStat">加载中…</span>
+                    <button class="btn btn-secondary btn-sm" id="libRefreshBtn" type="button">↻ 重载索引</button>
+                </div>
+            </div>
+
+            <div class="lib-layout">
+                <!-- 左：三级分类树 -->
+                <aside class="card lib-tree-card">
+                    <div class="card-header lib-tree-head">
+                        <h3>病例分类</h3>
+                        <span class="card-title-note" id="libTreeNote"></span>
+                    </div>
+                    <div class="card-body lib-tree-body">
+                        <div id="libTree" class="lib-tree"></div>
+                    </div>
+                </aside>
+
+                <!-- 右：筛选 + 病例表 -->
+                <section class="lib-main">
+                    <div class="card lib-filter-card">
+                        <div class="lib-filter-row">
+                            <input type="search" id="libKeyword" class="input" placeholder="搜索病历号 / 姓名 / 检查号 / 病名…">
+                            <select id="libModality" class="select">
+                                <option value="">全部模态</option>
+                                <option value="CT">CT</option>
+                                <option value="MR">MR</option>
+                            </select>
+                            <label class="checkbox-inline"><input type="checkbox" id="libHasDicom" checked> 有影像</label>
+                            <label class="checkbox-inline"><input type="checkbox" id="libHasReport"> 有报告</label>
+                            <select id="libStatus" class="select">
+                                <option value="">全部状态</option>
+                                <option value="published">已发布</option>
+                                <option value="draft">草稿</option>
+                            </select>
+                            <button class="btn btn-primary btn-sm" id="libSearchBtn" type="button">查询</button>
+                            <button class="btn btn-secondary btn-sm" id="libResetBtn" type="button">重置</button>
+                            <label class="checkbox-inline lib-path-scan">
+                                <button class="btn btn-secondary btn-sm" id="libScanBtn" type="button" title="扫描服务器上任意 DICOM 目录">📂 导入服务器目录</button>
+                            </label>
+                        </div>
+                        <div class="lib-crumb" id="libCrumb">全部分类</div>
+                    </div>
+
+                    <div class="card lib-table-card">
+                        <div class="lib-table-wrap">
+                            <table class="lib-table" id="libTable">
+                                <thead>
+                                    <tr>
+                                        <th>病历号</th>
+                                        <th>姓名</th>
+                                        <th>性别/年龄</th>
+                                        <th>分类</th>
+                                        <th>病名</th>
+                                        <th>影像</th>
+                                        <th>报告</th>
+                                        <th class="col-action"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="libTableBody">
+                                    <tr><td colspan="8" class="lib-empty">加载中…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="lib-pager" id="libPager"></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 病例详情抽屉：检查 → 序列选择 -->
+            <div class="lib-drawer" id="libDrawer" hidden>
+                <div class="lib-drawer-mask" data-close="1"></div>
+                <div class="lib-drawer-panel" role="dialog" aria-modal="true">
+                    <header class="lib-drawer-head">
+                        <div>
+                            <h3 id="libDrawerTitle">病例详情</h3>
+                            <div class="lib-drawer-sub" id="libDrawerSub"></div>
+                        </div>
+                        <button class="btn-icon-only" type="button" data-close="1" aria-label="关闭">✕</button>
+                    </header>
+
+                    <div class="lib-drawer-body">
+                        <div class="lib-drawer-col">
+                            <div class="lib-section-head">
+                                <h4>检查与序列</h4>
+                                <span class="card-title-note" id="libSeriesNote"></span>
+                            </div>
+                            <div id="libExamList" class="lib-exam-list"></div>
+                        </div>
+
+                        <div class="lib-drawer-col">
+                            <div class="lib-section-head">
+                                <h4>原始报告</h4>
+                                <span class="card-title-note" id="libReportNote">来自院内教学库，仅供对照</span>
+                            </div>
+                            <div id="libReportList" class="lib-report-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 批量处理页面 -->
+        <div id="batch-page" class="page">
+            <div class="page-header">
+                <h2>批量影像处理</h2>
+                <p>同时处理多个影像文件，提高工作效率</p>
+            </div>
+            <div class="batch-upload card">
+                <div class="card-header">
+                    <h3>批量上传</h3>
+                </div>
+                <div class="card-body">
+                    <input type="file" id="batchFileInput" multiple accept=".nii,.gz,.npy,.dcm,.dicom" hidden>
+                    <button class="btn btn-primary" onclick="document.getElementById('batchFileInput').click()">
+                        选择多个文件
+                    </button>
+                    <div id="batchResults" class="batch-results"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 历史记录页面 -->
+        <div id="history-page" class="page">
+            <div class="page-header">
+                <h2>诊断历史记录</h2>
+                <p>查看和管理历史诊断记录</p>
+            </div>
+            <div class="history-list card">
+                <div class="card-header">
+                    <h3>历史记录</h3>
+                    <span class="card-title-note">点击任意记录查看完整诊断结果</span>
+                </div>
+                <div class="card-body">
+                    <div id="historyList" class="history-items"></div>
+                </div>
+            </div>
+
+            <!-- 历史记录详情抽屉：展示入库的完整诊断结果（explanation/top_scores/
+                 warnings/metadata）与库内病例的原始报告对照。列表接口只带小摘要，
+                 完整数据按需从这里加载。 -->
+            <div class="lib-drawer" id="historyDrawer" hidden>
+                <div class="lib-drawer-mask" data-hist-close="1"></div>
+                <div class="lib-drawer-panel" role="dialog" aria-modal="true">
+                    <header class="lib-drawer-head">
+                        <div>
+                            <h3 id="histDrawerTitle">诊断记录详情</h3>
+                            <div class="lib-drawer-sub" id="histDrawerSub"></div>
+                        </div>
+                        <button class="btn-icon-only" type="button" data-hist-close="1" aria-label="关闭">✕</button>
+                    </header>
+                    <div class="lib-drawer-body" id="histDrawerBody"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统设置页面 -->
+        <div id="settings-page" class="page">
+            <div class="page-header">
+                <h2>系统设置</h2>
+                <p>配置系统参数和偏好设置</p>
+            </div>
+            <div class="settings-grid">
+                <div class="settings-card card">
+                    <h3>界面设置</h3>
+                    <div class="setting-item">
+                        <label for="themeSetting">主题</label>
+                        <select id="themeSetting">
+                            <option value="dark">深色主题</option>
+                            <option value="light">浅色主题</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="languageSetting">语言</label>
+                        <select id="languageSetting">
+                            <option value="zh-CN">中文</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-card card">
+                    <h3>AI模型设置</h3>
+                    <div class="setting-item">
+                        <label for="confidenceSetting">置信度阈值 <span id="confidenceSettingValue">70%</span></label>
+                        <input id="confidenceSetting" type="range" min="0" max="100" value="70">
+                    </div>
+                    <div class="setting-item">
+                        <label for="gpuSetting">使用GPU加速</label>
+                        <input id="gpuSetting" type="checkbox" checked>
+                    </div>
+                    <button class="btn btn-primary" id="saveSettingsBtn">保存设置</button>
+                </div>
+
+                <div class="settings-card card">
+                    <h3>系统信息</h3>
+                    <div class="info-item">
+                        <span>版本:</span>
+                        <span>v4.0 Flask专业版</span>
+                    </div>
+                    <div class="info-item">
+                        <span>最后更新:</span>
+                        <span>2026-09-30</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 加载提示 -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p id="loadingText">处理中...</p>
+    </div>
+
+    <!-- Toast通知 -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+    // 同源反代垫片：经主站 /radar/ 前缀访问时，页面 JS 里的根绝对路径
+    // （fetch('/api/...') 等）会绕过前缀打到主站自身 API。这里统一补前缀；
+    // 模板静态资源已改相对路径，随当前目录解析。直连 5000 端口无前缀时不生效。
+    (function () {
+        var m = location.pathname.match(/^\/radar(?=\/)/);
+        if (!m) return;
+        var prefix = '/radar';
+        var rewrite = function (u) {
+            return (typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/') ? prefix + u : u;
+        };
+        var origFetch = window.fetch;
+        window.fetch = function (input, init) {
+            if (typeof input === 'string') input = rewrite(input);
+            else if (input && input.url) input = new Request(rewrite(input.url), input);
+            return origFetch.call(this, input, init);
+        };
+        var OrigES = window.EventSource;
+        window.EventSource = function (url, opts) { return new OrigES(rewrite(url), opts); };
+        window.EventSource.prototype = OrigES.prototype;
+        // 上传走 XHR（要实时进度），open 的根绝对路径同样要补前缀
+        var origOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function (method, url) {
+            var args = Array.prototype.slice.call(arguments);
+            args[1] = rewrite(url);
+            return origOpen.apply(this, args);
+        };
+    })();
+    </script>
+    <script src="static/js/library.js"></script>
+    <script src="static/js/app.js?v=20261116-progfix"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "theme": "dark",
+  "language": "zh-CN",
+  "confidence_threshold": 0.7,
+  "use_gpu": true,
+  "viewer_source": "local5000",
+  "library_roots": [
+    {
+      "name": "清华长庚·腹部影像",
+      "path": "/home/rimagai/data2/qinghua-report/datasets/abdomen-export"
+    }
+  ]
+}
